@@ -1,0 +1,93 @@
+INSTRUCTIONS TO RUN THE SPEECH COMMAND RECOGNITION APPLICATION
+
+This document provides instructions to set up and run the Speech Command Recognition application.
+
+
+STEP 1: Create Project Directory
+--------------------------------
+Create a new directory for your project and navigate into it:
+
+    mkdir speech-command-app
+    cd speech-command-app
+
+
+STEP 2: Create the Application File (app.py)
+-----------------------------------------
+Save the Python code provided (from your notebook) into a file named `app.py` in your project directory.
+
+Example `app.py` content:
+
+    # 1. Setup imports
+    import tensorflow as tf
+    import librosa
+    import numpy as np
+    import gradio as gr
+    import json
+
+    # 2. Load the model and labels
+    model = tf.keras.models.load_model('speech_command_cnn.keras')
+    with open('./labels.json', 'r') as f:
+        classes = json.load(f)
+
+    # 3. Define the prediction pipeline (Self-contained)
+    def quick_predict(file_path):
+        # Feature extraction logic
+        audio, sr = librosa.load(file_path, sr=16000)
+        mel = librosa.feature.melspectrogram(y=audio, sr=sr, n_mels=64)
+        mel_db = librosa.power_to_db(mel, ref=np.max)
+        feature = tf.image.resize(mel_db[..., np.newaxis], [64, 64])
+        feature = (feature - tf.reduce_min(feature)) / (tf.reduce_max(feature) - tf.reduce_min(feature))
+
+        # Predict
+        prediction = model.predict(tf.expand_dims(feature, axis=0), verbose=0)[0]
+        return {classes[i]: float(prediction[i]) for i in range(len(classes))}
+
+    # 4. Launch UI
+    demo = gr.Interface(
+        fn=quick_predict,
+        inputs=gr.Audio(type="filepath"),
+        outputs=gr.Label(num_top_classes=5),
+        title="Pre-trained Voice AI"
+    )
+    demo.launch(share=True)
+
+*Note: Ensure the paths for `speech_command_cnn.keras` and `labels.json` are correct relative to your `app.py` script. The example above uses `./labels.json` for a relative path.*
+
+
+STEP 3: Create Requirements File (requirements.txt)
+------------------------------------------------
+Create a file named `requirements.txt` in the same directory as `app.py` with the following content:
+
+    tensorflow
+    librosa
+    numpy
+    gradio
+    soundfile
+
+
+STEP 4: Install Dependencies
+----------------------------
+Open your terminal or command prompt, navigate to your project directory (speech-command-app), and install the required Python packages:
+
+    pip install -r requirements.txt
+
+
+STEP 5: Place Model and Labels Files
+-----------------------------------
+Ensure that the following two files are present in the same directory as your `app.py` script:
+
+-   `speech_command_cnn.keras`: Your pre-trained TensorFlow Keras model file.
+-   `labels.json`: A JSON file containing the list of speech command labels.
+
+Example `labels.json` content:
+
+    ["yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go", "silence", "unknown"]
+
+
+STEP 6: Run the Application
+---------------------------
+Once all files are in place and dependencies are installed, run the Gradio application from your terminal:
+
+    python app.py
+
+The terminal will display a local and potentially a public URL (if `share=True` is enabled). Open this URL in your web browser to use the application.
